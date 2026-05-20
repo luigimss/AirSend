@@ -1,0 +1,191 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --bg: #fafafa;
+  --fg: #1a1a1a;
+  --accent: #0a84ff;
+  --muted: #6b7280;
+  --card: #ffffff;
+  --border: #e5e7eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a1a;
+    --fg: #f5f5f5;
+    --card: #262626;
+    --border: #3f3f46;
+    --muted: #a1a1aa;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+main {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+header h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.subtitle {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+button {
+  background: var(--accent);
+  color: white;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+button:hover { filter: brightness(1.05); }
+button:disabled { opacity: 0.5; cursor: default; }
+
+.status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+ul#devices {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.device {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.device .info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.device .name { font-weight: 600; }
+.device .meta { font-size: 12px; color: var(--muted); }
+.device.homepod { border-color: var(--accent); }
+.device.connected {
+  border-color: #16a34a;
+  background: color-mix(in srgb, #16a34a 8%, var(--card));
+}
+
+.device button.connect {
+  flex-shrink: 0;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+.device.connected button.connect {
+  background: #16a34a;
+}
+
+.player {
+  margin-top: 20px;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.player[hidden] { display: none; }
+.player-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.player button.play {
+  background: #16a34a;
+}
+.player button.play.playing {
+  background: #dc2626;
+}
+.player .vol {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.player .vol input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+.player .vol output {
+  font-variant-numeric: tabular-nums;
+  min-width: 38px;
+  text-align: right;
+  color: var(--fg);
+}
+
+details.manual {
+  margin-top: 24px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+details.manual summary {
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+
+details.manual .hint {
+  color: var(--muted);
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+details.manual input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+details.manual button {
+  font-size: 13px;
+  padding: 6px 12px;
+}

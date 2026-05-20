@@ -1,0 +1,30 @@
+# Rust
+/target
+/src-tauri/target
+/src-tauri/gen/schemas
+**/*.rs.bk
+Cargo.lock.bak
+
+# Node / Vite
+node_modules
+ui/dist
+ui/.vite
+
+# Tauri
+src-tauri/WixTools
+src-tauri/.tauri
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Secrets — NUNCA commitear claves de firma
+*.key
+tauri_signing_*.txt
+.env
+.env.local
