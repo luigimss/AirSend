@@ -1,5 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import {
+  applyStaticTranslations,
+  getLang,
+  onLangChange,
+  t,
+  toggleLang,
+} from "./i18n";
 
 type DeviceKind = "homepod" | "appletv" | "airportexpress" | "otherairplay";
 
@@ -46,7 +53,7 @@ function setupAsyncErrorListener() {
     showToast(event.payload);
     if (playing) {
       playing = false;
-      playerStatus.textContent = `error: ${event.payload}`;
+      playerStatus.textContent = t("error_prefix", { err: event.payload });
       updatePlayerUi();
     }
   });
@@ -77,7 +84,7 @@ async function connect(device: Device) {
     });
     connectedId = device.id;
   } catch (err) {
-    statusEl.textContent = `error: ${String(err)}`;
+    statusEl.textContent = t("error_prefix", { err: String(err) });
   } finally {
     connectingId = null;
     render();
@@ -108,10 +115,10 @@ function updatePlayerUi() {
   playerEl.hidden = !dev;
   if (!dev) return;
   if (playing) {
-    playBtn.textContent = "⏸ Parar";
+    playBtn.textContent = t("stop");
     playBtn.classList.add("playing");
   } else {
-    playBtn.textContent = `▶ Enviar audio del PC a ${dev.name}`;
+    playBtn.textContent = t("play_to", { name: dev.name });
     playBtn.classList.remove("playing");
   }
 }
@@ -122,7 +129,7 @@ async function startPlay() {
   const ip = dev.addresses.find((a) => !a.includes(":")) ?? dev.addresses[0];
   if (!ip) return;
   playBtn.disabled = true;
-  playerStatus.textContent = "iniciando…";
+  playerStatus.textContent = t("player_starting");
   try {
     const vol = Number(volumeSlider.value) / 100;
     await invoke("start_streaming", {
@@ -132,12 +139,12 @@ async function startPlay() {
       volume: vol,
     });
     playing = true;
-    playerStatus.textContent = "reproduciendo";
+    playerStatus.textContent = t("player_playing");
     // Persistimos para auto-reconnect (C2) y carga rápida en futuros arranques.
     void invoke("save_last_device", { ip, port: dev.port, name: dev.name });
     void invoke("save_volume", { volume: vol });
   } catch (err) {
-    playerStatus.textContent = `error: ${String(err)}`;
+    playerStatus.textContent = t("error_prefix", { err: String(err) });
   } finally {
     playBtn.disabled = false;
     updatePlayerUi();
@@ -173,7 +180,7 @@ volumeSlider.addEventListener("input", () => {
     try {
       await invoke("set_stream_volume", { volume: vol });
     } catch (err) {
-      playerStatus.textContent = `vol err: ${String(err)}`;
+      playerStatus.textContent = t("vol_error_prefix", { err: String(err) });
     }
   }, 120);
 });
@@ -203,13 +210,13 @@ function render() {
     const btn = document.createElement("button");
     btn.className = "connect";
     if (isConnecting) {
-      btn.textContent = "Conectando…";
+      btn.textContent = t("connecting");
       btn.disabled = true;
     } else if (isConnected) {
-      btn.textContent = "Desconectar";
+      btn.textContent = t("disconnect");
       btn.addEventListener("click", () => void disconnect());
     } else {
-      btn.textContent = "Conectar";
+      btn.textContent = t("connect");
       btn.disabled = connectingId !== null;
       btn.addEventListener("click", () => void connect(d));
     }
@@ -217,7 +224,10 @@ function render() {
 
     devicesList.appendChild(li);
   }
-  statusEl.textContent = `${known.size} dispositivo${known.size === 1 ? "" : "s"}`;
+  statusEl.textContent =
+    known.size === 1
+      ? t("devices_count_one")
+      : t("devices_count_other", { n: known.size });
   updatePlayerUi();
 }
 
@@ -229,7 +239,7 @@ function escape(s: string): string {
 
 async function startScan() {
   scanBtn.disabled = true;
-  statusEl.textContent = "buscando…";
+  statusEl.textContent = t("scan_searching");
   known.clear();
   render();
 
@@ -246,7 +256,7 @@ async function startScan() {
   try {
     await invoke("start_discovery_stream");
   } catch (err) {
-    statusEl.textContent = `error: ${String(err)}`;
+    statusEl.textContent = t("error_prefix", { err: String(err) });
   }
 
   scanBtn.disabled = false;
@@ -265,18 +275,18 @@ async function addManual() {
   const ip = manualIpInput.value.trim();
   const name = manualNameInput.value.trim() || null;
   if (!ip) {
-    manualStatus.textContent = "introduce una IP";
+    manualStatus.textContent = t("manual_need_ip");
     return;
   }
   manualBtn.disabled = true;
-  manualStatus.textContent = "verificando…";
+  manualStatus.textContent = t("manual_checking");
   try {
     const device = await invoke<Device>("add_manual_device", {
       ip,
       port: null,
       name,
     });
-    manualStatus.textContent = `OK: ${device.name}`;
+    manualStatus.textContent = t("manual_ok", { name: device.name });
     manualIpInput.value = "";
     manualNameInput.value = "";
   } catch (err) {
@@ -294,8 +304,31 @@ manualIpInput.addEventListener("keydown", (e) => {
 });
 
 setupAsyncErrorListener();
+setupLangToggle();
 void preloadSavedVolume();
 void bootstrap();
+
+function setupLangToggle() {
+  const btn = document.getElementById("lang-toggle") as HTMLButtonElement | null;
+  applyStaticTranslations();
+  refreshLangToggleLabel();
+  onLangChange(() => {
+    refreshLangToggleLabel();
+    // Re-render lo que tiene texto dinámico generado por JS.
+    render();
+    updatePlayerUi();
+  });
+  if (btn) btn.addEventListener("click", () => toggleLang());
+}
+
+function refreshLangToggleLabel() {
+  const btn = document.getElementById("lang-toggle") as HTMLButtonElement | null;
+  if (!btn) return;
+  btn.textContent = t(getLang() === "es" ? "lang_toggle_to_en" : "lang_toggle_to_es");
+  const title = t("lang_toggle_title");
+  btn.title = title;
+  btn.setAttribute("aria-label", title);
+}
 
 async function preloadSavedVolume() {
   try {
@@ -336,7 +369,7 @@ async function bootstrap() {
   }
   if (!last) return;
 
-  statusEl.textContent = `reconectando a ${last.name}…`;
+  statusEl.textContent = t("reconnecting", { name: last.name });
 
   const matchByIp = (): Device | null => {
     for (const d of known.values()) {
@@ -366,7 +399,7 @@ async function bootstrap() {
       found = dev;
       render();
     } catch (err) {
-      showToast(`no encuentro ${last.name}: ${String(err)}`, 6000);
+      showToast(t("cant_find", { name: last.name, err: String(err) }), 6000);
       return;
     }
   }
