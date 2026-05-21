@@ -1,0 +1,64 @@
+name: Release
+
+# Se dispara cuando se empuja un tag `v*` (p.ej. `v0.1.0`). El job genera
+# instalador NSIS firmado + latest.json y los publica como assets de un GitHub
+# Release nuevo (en draft, hay que publicar a mano cuando termines QA).
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # tauri-action necesita crear releases y subir assets
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - name: Install UI deps
+        run: npm --prefix ui ci
+
+      - name: Build, sign and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "ConexionAirPlay ${{ github.ref_name }}"
+          releaseBody: |
+            Cambios desde la versión anterior:
+            - (autogenerar con git log en futuras releases)
+
+            Instalación: descarga el `.exe` de NSIS y ejecútalo. SmartScreen
+            puede avisar la primera vez (no firmamos aún con cert EV) → "Más
+            información" → "Ejecutar igualmente".
+
+            Auto-update: al instalar v0.1.0 o superior, la app se actualizará
+            sola en futuros lanzamientos.
+          releaseDraft: true   # publicamos a mano tras QA
+          prerelease: false
+          # NB: dejamos el args vacío → cargo tauri build target msvc por defecto.
+          # Si en el futuro queremos exclusivamente nsis: `args: --bundles nsis`.

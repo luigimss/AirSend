@@ -48,6 +48,15 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 `/home/pablo/.claude/plans/quiero-tener-la-posibilidad-majestic-tower.md`
 
+## Publicar una release
+
+1. Bump la versión en `src-tauri/tauri.conf.json` (`version`) y en `Cargo.toml` (`workspace.package.version`).
+2. Commit y tag: `git tag v0.1.0 && git push origin v0.1.0`.
+3. GitHub Actions (`.github/workflows/release.yml`) compila en `windows-latest`, firma con la clave de actualización (secrets `TAURI_SIGNING_PRIVATE_KEY` y `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) y crea un **release en draft** con el `.exe` de NSIS, `.exe.sig` y `latest.json`.
+4. Cuando el draft esté listo y validado, **publícalo a mano** desde GitHub. Las apps instaladas detectarán el update.
+
+> Aviso de SmartScreen: al no firmar con certificado EV de código (≈200 €/año), la primera ejecución mostrará un aviso. Workaround para el usuario: "Más información" → "Ejecutar igualmente". Considerar firma EV en post-MVP.
+
 ## Licencia
 
 GPL-2.0 (compatible con `airplay2-rs`, usado como referencia).
