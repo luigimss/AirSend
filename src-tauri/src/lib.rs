@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -30,9 +31,15 @@ struct LastDevice {
 /// Mantiene el `Discovery` activo entre llamadas para no recrear el daemon
 /// (cada uno abre montones de sockets en 5353 — sin esto, cada hot-reload
 /// del frontend filtraba un daemon nuevo).
+///
+/// `cache` guarda todo dispositivo visto (mDNS o manual). El frontend llama
+/// `start_discovery_stream` cada vez que el usuario pulsa "Buscar"; sin
+/// replay, los anuncios mDNS ya consumidos no se vuelven a emitir y la lista
+/// queda vacía hasta el siguiente broadcast (puede tardar minutos).
 #[derive(Default)]
 struct DiscoveryState {
     inner: Mutex<Option<Discovery>>,
+    cache: Mutex<HashMap<String, Device>>,
 }
 
 /// Mantiene la sesión RTSP autenticada con el HomePod. Por ahora, sólo una a la
@@ -88,12 +95,29 @@ async fn start_discovery_stream(
     app: tauri::AppHandle,
     state: State<'_, DiscoveryState>,
 ) -> Result<(), String> {
+    // Replay del cache: si el usuario pulsó "Buscar" otra vez, el listener de JS
+    // se acaba de recrear con `known` vacío, así que reemitimos lo que ya
+    // conocemos para rellenar la lista al instante.
+    let cached: Vec<Device> = state
+        .cache
+        .lock()
+        .map_err(|e| e.to_string())?
+        .values()
+        .cloned()
+        .collect();
+    for dev in &cached {
+        let _ = app.emit("airplay://device", dev);
+    }
+
     // Lock + spawn + drop del guard antes de devolver. Sin await durante el lock,
     // así el std::sync::Mutex es seguro aunque la fn sea async.
     let mut rx = {
         let mut slot = state.inner.lock().map_err(|e| e.to_string())?;
         if slot.is_some() {
-            tracing::debug!("discovery ya en curso, ignoro start_discovery_stream");
+            tracing::debug!(
+                "discovery ya en curso, replayé {} cacheados",
+                cached.len()
+            );
             return Ok(());
         }
         let discovery = Discovery::new().map_err(|e| e.to_string())?;
@@ -102,9 +126,15 @@ async fn start_discovery_stream(
         rx
     };
 
+    let app_pump = app.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(device) = rx.recv().await {
-            if app.emit("airplay://device", &device).is_err() {
+            if let Some(state) = app_pump.try_state::<DiscoveryState>() {
+                if let Ok(mut cache) = state.cache.lock() {
+                    cache.insert(device.id.clone(), device.clone());
+                }
+            }
+            if app_pump.emit("airplay://device", &device).is_err() {
                 break;
             }
         }
@@ -362,6 +392,7 @@ async fn add_manual_device(
     ip: String,
     port: Option<u16>,
     name: Option<String>,
+    state: State<'_, DiscoveryState>,
 ) -> Result<Device, String> {
     let parsed: IpAddr = ip.parse().map_err(|e| format!("IP inválida '{ip}': {e}"))?;
     let port = port.unwrap_or(cap_core::probe::DEFAULT_AIRPLAY_PORT);
@@ -376,6 +407,10 @@ async fn add_manual_device(
         if server.to_lowercase().contains("airtunes") {
             device.supports_airplay2 = true;
         }
+    }
+
+    if let Ok(mut cache) = state.cache.lock() {
+        cache.insert(device.id.clone(), device.clone());
     }
 
     app.emit("airplay://device", &device)
