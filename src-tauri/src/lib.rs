@@ -680,11 +680,41 @@ async fn check_for_update(app: tauri::AppHandle) {
     }
 }
 
+/// Sube la clase de prioridad del proceso a HIGH_PRIORITY_CLASS en Windows.
+/// Combinado con MMCSS "Pro Audio" en el sender thread (fork airplay2-rs),
+/// elimina los tics audibles cada 20-30 s que ocurren porque el scheduler
+/// fairness de Windows degrada threads de proceso NORMAL bajo carga.
+#[cfg(windows)]
+fn raise_process_priority() {
+    use std::ffi::c_void;
+
+    #[allow(non_camel_case_types)]
+    type HANDLE = *mut c_void;
+    const HIGH_PRIORITY_CLASS: u32 = 0x0000_0080;
+
+    extern "system" {
+        fn GetCurrentProcess() -> HANDLE;
+        fn SetPriorityClass(process: HANDLE, class: u32) -> i32;
+    }
+
+    unsafe {
+        if SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS) != 0 {
+            tracing::info!("Windows: process priority elevated to HIGH_PRIORITY_CLASS");
+        } else {
+            tracing::warn!("Windows: SetPriorityClass(HIGH) failed");
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn raise_process_priority() {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // `_log_guard` debe vivir todo el programa para que el writer non-blocking
     // siga drenando logs al archivo. Lo "olvidamos" con un binding mut a static.
     let _log_guard = init_tracing();
+    raise_process_priority();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
