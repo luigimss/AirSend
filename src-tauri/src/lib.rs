@@ -619,6 +619,67 @@ fn init_tracing() -> Option<tracing_appender::non_blocking::WorkerGuard> {
     guard
 }
 
+/// Consulta `latest.json` del endpoint configurado, y si hay versión nueva la
+/// descarga + verifica firma + reinicia la app. Si falla (red caída, firma
+/// mala, etc.) sólo deja traza en logs y emite toast — nunca interrumpe el
+/// arranque normal.
+async fn check_for_update(app: tauri::AppHandle) {
+    use tauri_plugin_updater::UpdaterExt;
+
+    let updater = match app.updater() {
+        Ok(u) => u,
+        Err(e) => {
+            tracing::warn!("updater no disponible: {e}");
+            return;
+        }
+    };
+
+    let update = match updater.check().await {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            tracing::info!("updater: app al día");
+            return;
+        }
+        Err(e) => {
+            tracing::warn!("updater check falló: {e}");
+            return;
+        }
+    };
+
+    tracing::info!("updater: versión {} disponible, descargando…", update.version);
+    let _ = app.emit(
+        "airplay://error",
+        format!("Descargando actualización a {}…", update.version),
+    );
+
+    let mut downloaded: usize = 0;
+    let download_res = update
+        .download_and_install(
+            |chunk, total| {
+                downloaded += chunk;
+                if let Some(total) = total {
+                    tracing::debug!("updater: {} / {} bytes", downloaded, total);
+                }
+            },
+            || tracing::info!("updater: descarga completada"),
+        )
+        .await;
+
+    match download_res {
+        Ok(()) => {
+            tracing::info!("updater: actualización aplicada, reiniciando");
+            app.restart();
+        }
+        Err(e) => {
+            tracing::warn!("updater: download_and_install falló: {e}");
+            let _ = app.emit(
+                "airplay://error",
+                format!("Actualización fallida: {e}"),
+            );
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // `_log_guard` debe vivir todo el programa para que el writer non-blocking
@@ -667,6 +728,16 @@ pub fn run() {
                     }
                 });
             }
+
+            // Auto-updater: el plugin sólo descarga si se llama `check()`.
+            // Lo lanzamos en background para no bloquear la UI; si encuentra
+            // versión nueva, baja, verifica minisign con la pubkey de
+            // tauri.conf.json y reinicia la app.
+            let updater_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                check_for_update(updater_handle).await;
+            });
+
             Ok(())
         })
         .run(tauri::generate_context!())
