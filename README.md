@@ -1,97 +1,109 @@
-# AirSend 
+# AirSend
 <p align="center">
   <a href="README.md">English</a> ·
   <a href="README.es.md">Español</a>
 </p>
 
-Desktop app for Windows that captures the system audio and send it to a HomePod through AirPlay 2 with low latency
 
-> ⚠️ **State**: pre-alfa.
+Windows desktop app that captures system audio and sends it to a HomePod over AirPlay 2 with low latency.
+
+> ⚠️ **Status**: pre-alpha.
 
 
 
-## Instalation Guide
-Install the latest version in:
+## Installation
+
+Download the latest release:
 
 <a href="https://github.com/Pabldi08/AirSend/releases/latest">
   <img src="https://img.shields.io/badge/Download-Latest%20Release-blue?style=for-the-badge" alt="Download latest release">
 </a>
 
-
-> SmartScreen warning: As the app is not signed with an EV code certificate (approximately €200/year), the first run will display a warning. Workaround for the user: "Learn more" → "Run anyway". Consider EV signing in post-MVP.
+> SmartScreen warning: the app is not signed with an EV code-signing
+> certificate (~€200/year), so the first run shows a warning.
+> Workaround: "More info" → "Run anyway". EV signing is under
+> consideration post-MVP.
 
 ## Comparison with alternatives
 
-Esta tabla resume las diferencias principales entre AirSend y algunas alternativas populares.  
-AirSend prioriza ser gratuito, auditable y compatible con HomePod mediante AirPlay 2, aunque todavía es un proyecto joven y no pretende cubrir funciones como mirroring de pantalla o multi-destino.
+This table summarizes the main differences between AirSend and some
+popular alternatives. AirSend prioritizes being free, auditable and
+compatible with HomePod over AirPlay 2 — it is still a young project
+and does not aim to cover screen mirroring or multi-target streaming.
 
-| Característica | AirSend | TuneBlade | AirParrot |
+| Feature | AirSend | TuneBlade | AirParrot |
 |---|---|---|---|
-| Plataforma | Windows | Windows | Windows + macOS |
-| Licencia / precio | GPL-2.0, gratis | Freeware, closed-source | Comercial (~15 €) |
-| AirPlay 2 con HomePod | ✅  | ⚠️ Inestable / no pairea en muchos casos | ✅ |
-| Pair-setup transient + verify | ✅ | ❌, sólo AirPlay 1 fiable | ✅ |
+| Platform | Windows | Windows | Windows + macOS |
+| License / price | GPL-2.0, free | Freeware, closed-source | Commercial (~€15) |
+| AirPlay 2 with HomePod | ✅ | ⚠️ Unstable / often fails to pair | ✅ |
+| Pair-setup transient + verify | ✅ | ❌, reliable only on AirPlay 1 | ✅ |
 | Codec | ALAC + ChaCha20-Poly1305 | ALAC | ALAC |
-| Captura | WASAPI loopback, audio del sistema | WASAPI loopback | WASAPI loopback + cherry-pick de apps |
+| Capture | WASAPI loopback (system audio) | WASAPI loopback | WASAPI loopback + per-app picker |
 | Tray + close-to-tray | ✅ | ✅ | ✅ |
-| Auto-reconnect al último device | ✅ | ✅ | ✅ |
-| IP manual si mDNS falla | ✅ | ❌ | ⚠️ Limitado |
-| Latencia HomePod estable | 500 ms – 3 s configurable | Variable | Alta, desync ocasional |
-| Jitter Windows en release | ✅ MMCSS Pro Audio + HIGH_PRIORITY | ❌ | ✅ |
-| Desarrollo activo | ✅ | ❌, parado desde hace años | ✅ |
-| Código auditable | ✅ | ❌ | ❌ |
-| Probado en hardware | ✅ | ✅ | ✅ |
+| Auto-reconnect to last device | ✅ | ✅ | ✅ |
+| Manual IP when mDNS fails | ✅ | ❌ | ⚠️ Limited |
+| Stable HomePod latency | 500 ms – 3 s, configurable | Variable | High, occasional desync |
+| Windows jitter in release builds | ✅ MMCSS Pro Audio + HIGH_PRIORITY | ❌ | ✅ |
+| Active development | ✅ | ❌, stalled for years | ✅ |
+| Auditable source | ✅ | ❌ | ❌ |
+| Tested on hardware | ⚠️ 1 setup (HomePod gen 2) | ✅ Years, broad hw | ✅ Years, broad hw |
 
-## Estado del proyecto
+## Project status
 
-AirSend está en una fase inicial de desarrollo. La versión actual ya permite enviar audio del sistema desde Windows a un HomePod mediante AirPlay 2, pero todavía no pretende sustituir completamente a soluciones comerciales más maduras.
+AirSend is in an early stage. The current version already streams system
+audio from Windows to a HomePod over AirPlay 2, but does not yet aim to
+fully replace more mature commercial solutions.
 
-El objetivo principal del proyecto es ofrecer una alternativa gratuita, abierta y auditable para usuarios que quieran enviar audio desde Windows a dispositivos AirPlay compatibles.
+The main goal of the project is to offer a free, open and auditable
+alternative for users who want to stream audio from Windows to
+AirPlay-compatible devices.
 
 ## Roadmap
 
-### Versión actual: 0.1.4
+### Current version: 0.1.4
 
-- [x] Captura de audio del sistema mediante WASAPI loopback
-- [x] Envío de audio a dispositivos AirPlay 2
-- [x] Soporte para HomePod mediante pair-setup
-- [x] Reconexión automática al último dispositivo
-- [x] Opción de IP manual cuando mDNS falla
-- [x] Integración con bandeja del sistema
-- [x] Auto-update firmado con minisign
+- [x] System audio capture via WASAPI loopback
+- [x] AirPlay 2 streaming (ALAC + ChaCha20-Poly1305 + RTSP/RTP)
+- [x] HomePod pair-setup transient + pair-verify
+- [x] RTSP heartbeat to keep the session alive (~10 s without it, the HomePod drops it)
+- [x] mDNS discovery with cache replay on rescan
+- [x] Add device by manual IP (networks with broken mDNS: Movistar HGU routers, VLANs)
+- [x] Auto-reconnect to the last device on startup
+- [x] Persistent volume across sessions
+- [x] System tray + close-to-tray (app keeps running in the background)
+- [x] Daily-rotated log files + UI toast for async errors
+- [x] Signed auto-update via minisign + GitHub Releases
+- [x] Windows jitter fix: `HIGH_PRIORITY_CLASS` + MMCSS "Pro Audio" + `THREAD_PRIORITY_TIME_CRITICAL`
 
-### Próximas mejoras
+### Next improvements
 
-- [ ] Mejorar el sistema de descubrimiento de dispositivos por mDNS
-- [ ] Añadir selector gráfico de dispositivo
-- [ ] Mejorar mensajes de error y logs
-- [ ] Reducir avisos de SmartScreen mediante firma de código
-- [ ] Mejorar la estabilidad en redes con VLANs o routers problemáticos
-- [ ] Añadir documentación técnica sobre AirPlay 2 y pairing
+- [ ] Auto-generated release notes from `git log` in the workflow
+- [ ] Minimal unit tests in `crates/airplay-core` (probe parser, stream config builder, pump-loop smoke)
+- [ ] Validation on more hardware (HomePod gen 1, mini, Apple TV, AirPort Express)
+- [ ] Technical docs on AirPlay 2 and pairing under `/docs`
+- [ ] EV code-signing certificate to drop the SmartScreen warning (~€200/year, budget decision)
 
-### Futuro
+### Future
 
-- [ ] Soporte multi-dispositivo
-- [ ] Selección de audio por aplicación
-- [ ] Perfiles de latencia
-- [ ] Mejor integración con Windows
-- [ ] Tests automatizados de red y audio
-
-## Publicar una release
-
-1. Bump la versión en `src-tauri/tauri.conf.json` (`version`) y en `Cargo.toml` (`workspace.package.version`).
-2. Commit y tag: `git tag v0.1.0 && git push origin v0.1.0`.
-3. GitHub Actions (`.github/workflows/release.yml`) compila en `windows-latest`, firma con la clave de actualización (secrets `TAURI_SIGNING_PRIVATE_KEY` y `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) y crea un **release en draft** con el `.exe` de NSIS, `.exe.sig` y `latest.json`.
-4. Cuando el draft esté listo y validado, **publícalo a mano** desde GitHub. Las apps instaladas detectarán el update.
+- [ ] Simultaneous multi-target (group streaming to multiple HomePods)
+- [ ] Per-application audio capture (WASAPI process-loopback, Win10 1903+)
+- [ ] Preset latency profiles (Music / Video / Gaming)
+- [ ] Upstream PR to `lmcgartland/airplay2-rs` with the two Windows patches
+- [ ] Stable support for other AirPlay 2 receivers (Apple TV, AirPort Express, third-party speakers)
 
 ## Stack
 
-- **Rust** + **Tauri v2** (UI con webview nativo de Windows, sin Electron)
-- **mdns-sd** para descubrir dispositivos AirPlay en la red local
-- **WASAPI loopback** para capturar el audio del sistema (sólo Windows)
-- **ALAC** + **RTP cifrado** para enviar al HomePod (pendiente)
-- Instalador **NSIS** y auto-updater vía **GitHub Releases**
+- **Rust** + **Tauri v2** (native Windows webview UI, no Electron)
+- **mdns-sd** for AirPlay device discovery on the local network
+- **WASAPI loopback** for system audio capture (Windows only)
+- **ALAC** + **encrypted RTP** (ChaCha20-Poly1305) for HomePod streaming
+- **NSIS** installer and signed auto-updater (minisign) via **GitHub Releases**
 
-## Licencia
+## Contributing
 
-GPL-2.0 (compatible con `airplay2-rs`, usado como referencia).
+Release instructions and maintainer notes live in
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+GPL-2.0 (compatible with `airplay2-rs`, used as upstream base).
