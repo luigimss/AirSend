@@ -133,6 +133,9 @@ async function startPlay() {
     });
     playing = true;
     playerStatus.textContent = "reproduciendo";
+    // Persistimos para auto-reconnect (C2) y carga rápida en futuros arranques.
+    void invoke("save_last_device", { ip, port: dev.port, name: dev.name });
+    void invoke("save_volume", { volume: vol });
   } catch (err) {
     playerStatus.textContent = `error: ${String(err)}`;
   } finally {
@@ -160,11 +163,15 @@ playBtn.addEventListener("click", () => {
 
 volumeSlider.addEventListener("input", () => {
   volumeOut.textContent = `${volumeSlider.value}%`;
-  if (!playing) return;
   if (volumeDebounce) clearTimeout(volumeDebounce);
   volumeDebounce = window.setTimeout(async () => {
+    const vol = Number(volumeSlider.value) / 100;
+    // Persistimos siempre (aunque no haya streaming activo) para que el próximo
+    // arranque recuerde la preferencia del usuario.
+    void invoke("save_volume", { volume: vol });
+    if (!playing) return;
     try {
-      await invoke("set_stream_volume", { volume: Number(volumeSlider.value) / 100 });
+      await invoke("set_stream_volume", { volume: vol });
     } catch (err) {
       playerStatus.textContent = `vol err: ${String(err)}`;
     }
@@ -287,4 +294,18 @@ manualIpInput.addEventListener("keydown", (e) => {
 });
 
 setupAsyncErrorListener();
+void preloadSavedVolume();
 void startScan();
+
+async function preloadSavedVolume() {
+  try {
+    const v = await invoke<number | null>("get_volume");
+    if (v !== null && v !== undefined) {
+      const pct = Math.round(Math.max(0, Math.min(1, v)) * 100);
+      volumeSlider.value = String(pct);
+      volumeOut.textContent = `${pct}%`;
+    }
+  } catch {
+    // sin volumen guardado todavía, se queda el default del HTML.
+  }
+}

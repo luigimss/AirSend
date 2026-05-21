@@ -9,7 +9,21 @@ use cap_core::{
     probe_airplay, Device, Discovery,
 };
 use tauri::{Emitter, State};
+use tauri_plugin_store::StoreExt;
 use tracing_subscriber::EnvFilter;
+
+/// Nombre del archivo de la store en `%APPDATA%/<bundle-id>/`. Lo lleva
+/// `tauri-plugin-store` por nosotros — sólo necesitamos una clave estable.
+const STORE_FILE: &str = "settings.json";
+const KEY_LAST_DEVICE: &str = "last_device";
+const KEY_VOLUME: &str = "volume";
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct LastDevice {
+    ip: String,
+    port: u16,
+    name: String,
+}
 
 /// Mantiene el `Discovery` activo entre llamadas para no recrear el daemon
 /// (cada uno abre montones de sockets en 5353 — sin esto, cada hot-reload
@@ -368,6 +382,74 @@ async fn add_manual_device(
     Ok(device)
 }
 
+// ── Persistencia (C1) ────────────────────────────────────────────────────────
+//
+// Usamos `tauri-plugin-store` para volcar a `%APPDATA%/<bundle-id>/settings.json`
+// las preferencias del usuario que sobreviven a reinicios de la app:
+// - Último HomePod conectado: para reconectar en frío y para el menú del tray.
+// - Volumen: para que la sesión nueva arranque al nivel que dejaste.
+//
+// El plugin maneja serialización JSON, escritura atómica y carga lazy.
+
+#[tauri::command]
+fn save_last_device(
+    app: tauri::AppHandle,
+    ip: String,
+    port: u16,
+    name: String,
+) -> Result<(), String> {
+    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
+    let dev = LastDevice { ip, port, name };
+    store.set(
+        KEY_LAST_DEVICE,
+        serde_json::to_value(&dev).map_err(|e| e.to_string())?,
+    );
+    store.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn get_last_device(app: tauri::AppHandle) -> Result<Option<LastDevice>, String> {
+    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
+    let value = store.get(KEY_LAST_DEVICE);
+    match value {
+        Some(v) => serde_json::from_value(v).map(Some).map_err(|e| e.to_string()),
+        None => Ok(None),
+    }
+}
+
+#[tauri::command]
+fn clear_last_device(app: tauri::AppHandle) -> Result<(), String> {
+    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
+    store.delete(KEY_LAST_DEVICE);
+    store.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn save_volume(app: tauri::AppHandle, volume: f32) -> Result<(), String> {
+    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
+    let v = volume.clamp(0.0, 1.0);
+    store.set(
+        KEY_VOLUME,
+        serde_json::to_value(v).map_err(|e| e.to_string())?,
+    );
+    store.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn get_volume(app: tauri::AppHandle) -> Result<Option<f32>, String> {
+    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
+    let value = store.get(KEY_VOLUME);
+    match value {
+        Some(v) => serde_json::from_value(v).map(Some).map_err(|e| e.to_string()),
+        None => Ok(None),
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 /// Localización de los logs por plataforma. Windows usa %APPDATA% (igual que
 /// hace Tauri por defecto para `app_log_dir` con el bundle id de la app).
 /// Si no se puede resolver, devolvemos None y los logs quedan solo en stdout.
@@ -457,6 +539,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .manage(DiscoveryState::default())
         .manage(ConnectionState::default())
         .manage(StreamingState::default())
@@ -471,7 +554,12 @@ pub fn run() {
             start_streaming,
             stop_streaming,
             set_stream_volume,
-            is_streaming
+            is_streaming,
+            save_last_device,
+            get_last_device,
+            clear_last_device,
+            save_volume,
+            get_volume,
         ])
         .setup(|app| {
             let _ = app.handle();
